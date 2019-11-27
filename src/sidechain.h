@@ -11,8 +11,8 @@
 #include <array>
 
 // These are the temporary values to speed things up during testing
-static const int SIDECHAIN_VERIFICATION_PERIOD = 300;
-static const int SIDECHAIN_MIN_WORKSCORE = 140;
+static const int SIDECHAIN_VERIFICATION_PERIOD = 32;
+static const int SIDECHAIN_MIN_WORKSCORE = 16;
 
 // These are the values that will be used in the final release
 //static const int SIDECHAIN_VERIFICATION_PERIOD = 26298;
