@@ -18,7 +18,6 @@ uint256 CBlockHeader::GetHash() const
 uint256 CBlockHeader::GetPoWHash() const
 {
     // For testing we will use the same algo as BTC
-    // return SerializeSHAndwichHash(*this);
     return SerializeHash(*this);
 }
 
