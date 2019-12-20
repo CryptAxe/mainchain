@@ -263,6 +263,8 @@ enum ServiceFlags : uint64_t {
     // NODE_XTHIN means the node supports Xtreme Thinblocks
     // If this is turned off then the node will not service nor make xthin requests
     NODE_XTHIN = (1 << 4),
+    // NODE_DRIVECHAIN means that this node supports DriveChain
+    NODE_DRIVECHAIN = (1 << 5),
     // NODE_NETWORK_LIMITED means the same as NODE_NETWORK with the limitation of only
     // serving the last 288 (2 day) blocks
     // See BIP159 for details on how this is implemented.
@@ -302,7 +304,7 @@ enum ServiceFlags : uint64_t {
  * should be updated appropriately to filter for the same nodes.
  */
 static ServiceFlags GetDesirableServiceFlags(ServiceFlags services) {
-    return ServiceFlags(NODE_NETWORK | NODE_WITNESS);
+    return ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_DRIVECHAIN);
 }
 
 /**
@@ -360,6 +362,7 @@ public:
 
 /** getdata message type flags */
 const uint32_t MSG_WITNESS_FLAG = 1 << 30;
+const uint32_t MSG_DRIVECHAIN_FLAG = 1 << 20;
 const uint32_t MSG_TYPE_MASK    = 0xffffffff >> 2;
 
 /** getdata / inv message types.
@@ -377,6 +380,8 @@ enum GetDataMsg
     MSG_WITNESS_BLOCK = MSG_BLOCK | MSG_WITNESS_FLAG, //!< Defined in BIP144
     MSG_WITNESS_TX = MSG_TX | MSG_WITNESS_FLAG,       //!< Defined in BIP144
     MSG_FILTERED_WITNESS_BLOCK = MSG_FILTERED_BLOCK | MSG_WITNESS_FLAG,
+    MSG_DRIVECHAIN_BLOCK = MSG_BLOCK | MSG_WITNESS_FLAG | MSG_DRIVECHAIN_FLAG,
+    MSG_DRIVECHAIN_TX = MSG_TX | MSG_WITNESS_FLAG | MSG_DRIVECHAIN_FLAG,
 };
 
 /** inv message data */
