@@ -13,7 +13,7 @@
 #include <uint256.h>
 
 static const int SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000;
-static const int SERIALIZE_TRANSACTION_NO_DRIVECHAIN = 0x41000000;//0x33333333;
+static const int SERIALIZE_TRANSACTION_NO_DRIVECHAIN = 0x20000000;
 
 static const unsigned char TX_REPLAY_BYTES = 0x3f;
 
@@ -250,7 +250,9 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
         s >> noreplay;
     }
 
-    const bool fAllowCriticalData = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_DRIVECHAIN) && tx.nVersion == 3;
+    const bool fAllowCriticalData = fAllowWitness &&
+        !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_DRIVECHAIN) &&
+        tx.nVersion == 3;
 
     unsigned char flags = 0;
     tx.vin.clear();
@@ -290,7 +292,9 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
 template<typename Stream, typename TxType>
 inline void SerializeTransaction(const TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
-    const bool fAllowCriticalData = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_DRIVECHAIN) && tx.nVersion == 3;
+    const bool fAllowCriticalData = fAllowWitness &&
+        !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_DRIVECHAIN) &&
+        tx.nVersion == 3;
 
     s << tx.nVersion;
     if (tx.nVersion == 4) {

@@ -104,7 +104,7 @@ bool CheckTxScriptsSanity(const CMutableTransaction& tx)
             return false;
         }
     }
-    
+
     return true;
 }
 
@@ -117,7 +117,7 @@ bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no
     std::vector<unsigned char> txData(ParseHex(hex_tx));
 
     if (try_no_witness) {
-        CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS);
+        CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS | SERIALIZE_TRANSACTION_NO_DRIVECHAIN);
         try {
             ssData >> tx;
             if (ssData.eof() && (!try_witness || CheckTxScriptsSanity(tx))) {
@@ -139,7 +139,7 @@ bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no
             // Fall through.
         }
     }
-    
+
     return false;
 }
 

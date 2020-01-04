@@ -64,20 +64,23 @@ CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::CURRENT_VERS
 CMutableTransaction::CMutableTransaction(const CTransaction& tx) : vin(tx.vin), vout(tx.vout), criticalData(tx.criticalData), nVersion(tx.nVersion), nLockTime(tx.nLockTime) {}
 uint256 CMutableTransaction::GetHash() const
 {
-    return SerializeHash(*this, SER_GETHASH, SERIALIZE_TRANSACTION_NO_WITNESS);
+    return SerializeHash(*this, SER_GETHASH, SERIALIZE_TRANSACTION_NO_WITNESS | SERIALIZE_TRANSACTION_NO_DRIVECHAIN);
 }
 
 uint256 CTransaction::ComputeHash() const
 {
-    return SerializeHash(*this, SER_GETHASH, SERIALIZE_TRANSACTION_NO_WITNESS);
+    return SerializeHash(*this, SER_GETHASH, SERIALIZE_TRANSACTION_NO_WITNESS | SERIALIZE_TRANSACTION_NO_DRIVECHAIN);
 }
 
 uint256 CTransaction::GetWitnessHash() const
 {
-    if (!HasWitness()) {
+    if (!HasWitness() && nVersion != 3) {
         return GetHash();
+    } else if (nVersion == 3) {
+        return SerializeHash(*this, SER_GETHASH, 0);
+    } else {
+        return SerializeHash(*this, SER_GETHASH, SERIALIZE_TRANSACTION_NO_DRIVECHAIN);
     }
-    return SerializeHash(*this, SER_GETHASH, 0);
 }
 
 bool CTransaction::GetBWTHash(uint256& hashRet) const

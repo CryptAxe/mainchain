@@ -886,12 +886,19 @@ void PeerLogicValidation::NewPoWValidBlock(const CBlockIndex *pindex, const std:
         CNodeState &state = *State(pnode->GetId());
         // If the peer has, or we announced to them the previous block already,
         // but we don't think they have this one, go ahead and announce it
-        if (state.fPreferHeaderAndIDs && (!fWitnessEnabled || !fDrivechainEnabled || state.fWantsCmpctWitness) &&
+        if (state.fPreferHeaderAndIDs && (!fWitnessEnabled || state.fWantsCmpctWitness) &&
                 !PeerHasHeader(&state, pindex) && PeerHasHeader(&state, pindex->pprev)) {
 
             LogPrint(BCLog::NET, "%s sending header-and-ids %s to peer=%d\n", "PeerLogicValidation::NewPoWValidBlock",
                     hashBlock.ToString(), pnode->GetId());
-            connman->PushMessage(pnode, msgMaker.Make(NetMsgType::CMPCTBLOCK, *pcmpctblock));
+
+            bool fPeerHasDrivechain = state.fHaveDrivechain;
+            if (fPeerHasDrivechain) {
+                connman->PushMessage(pnode, msgMaker.Make(NetMsgType::CMPCTBLOCK, *pcmpctblock));
+            }
+            else {
+                connman->PushMessage(pnode, msgMaker.Make(SERIALIZE_TRANSACTION_NO_DRIVECHAIN, NetMsgType::CMPCTBLOCK, *pcmpctblock));
+            }
             state.pindexBestHeaderSent = pindex;
         }
     });
@@ -1128,15 +1135,15 @@ void static ProcessGetBlockData(CNode* pfrom, const Consensus::Params& consensus
                 assert(!"cannot load block from disk");
             pblock = pblockRead;
         }
-        if (inv.type == MSG_BLOCK)
+        if (inv.type == MSG_BLOCK) {
             connman->PushMessage(pfrom, msgMaker.Make(SERIALIZE_TRANSACTION_NO_WITNESS | SERIALIZE_TRANSACTION_NO_DRIVECHAIN, NetMsgType::BLOCK, *pblock));
+        }
         else if (inv.type == MSG_WITNESS_BLOCK) {
-        //    connman->PushMessage(pfrom, msgMaker.Make(SERIALIZE_TRANSACTION_NO_DRIVECHAIN, NetMsgType::BLOCK, *pblock));
+            connman->PushMessage(pfrom, msgMaker.Make(SERIALIZE_TRANSACTION_NO_DRIVECHAIN, NetMsgType::BLOCK, *pblock));
+        }
+        else if (inv.type == MSG_DRIVECHAIN_BLOCK) {
             connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCK, *pblock));
         }
-        //else if (inv.type == MSG_DRIVECHAIN_BLOCK) {
-        //    connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCK, *pblock));
-        //}
         else if (inv.type == MSG_FILTERED_BLOCK)
         {
             bool sendMerkleBlock = false;
@@ -1158,7 +1165,7 @@ void static ProcessGetBlockData(CNode* pfrom, const Consensus::Params& consensus
                 // however we MUST always provide at least what the remote peer needs
                 typedef std::pair<unsigned int, uint256> PairType;
                 for (PairType& pair : merkleBlock.vMatchedTxn)
-                    connman->PushMessage(pfrom, msgMaker.Make(SERIALIZE_TRANSACTION_NO_WITNESS, NetMsgType::TX, *pblock->vtx[pair.first]));
+                    connman->PushMessage(pfrom, msgMaker.Make(SERIALIZE_TRANSACTION_NO_WITNESS | SERIALIZE_TRANSACTION_NO_DRIVECHAIN, NetMsgType::TX, *pblock->vtx[pair.first]));
             }
             // else
                 // no response
@@ -1170,7 +1177,10 @@ void static ProcessGetBlockData(CNode* pfrom, const Consensus::Params& consensus
             // and we don't feel like constructing the object for them, so
             // instead we respond with the full, non-compact block.
             bool fPeerWantsWitness = State(pfrom->GetId())->fWantsCmpctWitness;
+            bool fPeerWantsDrivechain = State(pfrom->GetId())->fHaveDrivechain;
             int nSendFlags = fPeerWantsWitness ? 0 : SERIALIZE_TRANSACTION_NO_WITNESS;
+            if (!fPeerWantsDrivechain)
+                nSendFlags |= SERIALIZE_TRANSACTION_NO_DRIVECHAIN;
             if (CanDirectFetch(consensusParams) && mi->second->nHeight >= chainActive.Height() - MAX_CMPCTBLOCK_DEPTH) {
                 if ((fPeerWantsWitness || !fWitnessesPresentInARecentCompactBlock) && a_recent_compact_block && a_recent_compact_block->header.GetHash() == mi->second->GetBlockHash()) {
                     connman->PushMessage(pfrom, msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK, *a_recent_compact_block));
@@ -1207,7 +1217,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
     {
         LOCK(cs_main);
 
-        while (it != pfrom->vRecvGetData.end() && (it->type == MSG_TX || it->type == MSG_WITNESS_TX)) {
+        while (it != pfrom->vRecvGetData.end() && (it->type == MSG_TX || it->type == MSG_WITNESS_TX || it->type == MSG_DRIVECHAIN_TX)) {
             if (interruptMsgProc)
                 return;
             // Don't bother if send buffer is too full to respond anyway
@@ -1221,6 +1231,9 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
             bool push = false;
             auto mi = mapRelay.find(inv.hash);
             int nSendFlags = (inv.type == MSG_TX ? SERIALIZE_TRANSACTION_NO_WITNESS : 0);
+            if (inv.type != MSG_DRIVECHAIN_TX) {
+                nSendFlags |= SERIALIZE_TRANSACTION_NO_DRIVECHAIN;
+            }
             if (mi != mapRelay.end()) {
                 connman->PushMessage(pfrom, msgMaker.Make(nSendFlags, NetMsgType::TX, *mi->second));
                 push = true;
@@ -1245,7 +1258,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
     if (it != pfrom->vRecvGetData.end()) {
         const CInv &inv = *it;
         it++;
-        if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_WITNESS_BLOCK) {
+        if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_WITNESS_BLOCK || inv.type == MSG_DRIVECHAIN_BLOCK) {
             ProcessGetBlockData(pfrom, consensusParams, inv, connman, interruptMsgProc);
         }
     }
@@ -1287,7 +1300,12 @@ inline void static SendBlockTransactions(const CBlock& block, const BlockTransac
     }
     LOCK(cs_main);
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
+    // I think the code here is going to not include the no_drivechain flag if
+    // the peer requets compact witness DERP
     int nSendFlags = State(pfrom->GetId())->fWantsCmpctWitness ? 0 : SERIALIZE_TRANSACTION_NO_WITNESS;
+    if (!State(pfrom->GetId())->fHaveDrivechain) {
+        nSendFlags |= SERIALIZE_TRANSACTION_NO_DRIVECHAIN;
+    }
     connman->PushMessage(pfrom, msgMaker.Make(nSendFlags, NetMsgType::BLOCKTXN, resp));
 }
 
@@ -3371,13 +3389,17 @@ bool PeerLogicValidation::SendMessages(CNode* pto, std::atomic<bool>& interruptM
                             vHeaders.front().GetHash().ToString(), pto->GetId());
 
                     int nSendFlags = state.fWantsCmpctWitness ? 0 : SERIALIZE_TRANSACTION_NO_WITNESS;
+                    if (!state.fHaveDrivechain) {
+                        nSendFlags |= SERIALIZE_TRANSACTION_NO_DRIVECHAIN;
+                    }
 
                     bool fGotBlockFromCache = false;
                     {
                         LOCK(cs_most_recent_block);
                         if (most_recent_block_hash == pBestIndex->GetBlockHash()) {
-                            if (state.fWantsCmpctWitness || !fWitnessesPresentInMostRecentCompactBlock)
+                            if (state.fWantsCmpctWitness || !fWitnessesPresentInMostRecentCompactBlock) {
                                 connman->PushMessage(pto, msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK, *most_recent_compact_block));
+                            }
                             else {
                                 CBlockHeaderAndShortTxIDs cmpctblock(*most_recent_block, state.fWantsCmpctWitness);
                                 connman->PushMessage(pto, msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK, cmpctblock));

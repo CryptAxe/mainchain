@@ -163,7 +163,11 @@ std::string CInv::GetCommand() const
     std::string cmd;
     if (type & MSG_WITNESS_FLAG)
         cmd.append("witness-");
+    if (type & MSG_DRIVECHAIN_FLAG)
+        cmd.append("drivechain-");
+
     int masked = type & MSG_TYPE_MASK;
+
     switch (masked)
     {
     case MSG_TX:             return cmd.append(NetMsgType::TX);

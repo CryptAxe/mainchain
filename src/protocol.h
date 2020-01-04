@@ -362,7 +362,7 @@ public:
 
 /** getdata message type flags */
 const uint32_t MSG_WITNESS_FLAG = 1 << 30;
-const uint32_t MSG_DRIVECHAIN_FLAG = 1 << 20;
+const uint32_t MSG_DRIVECHAIN_FLAG = 1 << 29;
 const uint32_t MSG_TYPE_MASK    = 0xffffffff >> 2;
 
 /** getdata / inv message types.
