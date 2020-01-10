@@ -108,7 +108,7 @@ bool CheckTxScriptsSanity(const CMutableTransaction& tx)
     return true;
 }
 
-bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness, bool try_witness)
+bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness, bool try_witness, bool try_drivechain)
 {
     if (!IsHex(hex_tx)) {
         return false;
@@ -128,8 +128,20 @@ bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no
         }
     }
 
-    if (try_witness) {
+    if (try_drivechain) {
         CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
+        try {
+            ssData >> tx;
+            if (ssData.empty()) {
+                return true;
+            }
+        } catch (const std::exception& e) {
+            // Fall through.
+        }
+    }
+
+    if (try_witness) {
+        CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_DRIVECHAIN);
         try {
             ssData >> tx;
             if (ssData.empty()) {

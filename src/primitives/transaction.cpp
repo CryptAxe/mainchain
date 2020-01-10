@@ -76,8 +76,6 @@ uint256 CTransaction::GetWitnessHash() const
 {
     if (!HasWitness() && nVersion != 3) {
         return GetHash();
-    } else if (nVersion == 3) {
-        return SerializeHash(*this, SER_GETHASH, 0);
     } else {
         return SerializeHash(*this, SER_GETHASH, SERIALIZE_TRANSACTION_NO_DRIVECHAIN);
     }
